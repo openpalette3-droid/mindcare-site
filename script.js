@@ -1,5 +1,5 @@
 // Leave empty for demo mode. After deploying the back end, set to its URL, e.g. "https://api.mindcare.rw"
-const API_BASE = "";
+const API_BASE = "https://mindcare-backend-wjl7.onrender.com";
 const tabs=document.querySelectorAll(".tab"),cat=document.getElementById("cat");
 function showTab(i){tabs.forEach((t,n)=>{t.setAttribute("aria-selected",n==i);document.getElementById("p"+n).hidden=n!=i})}
 tabs.forEach(t=>t.addEventListener("click",()=>showTab(+t.dataset.i)));
