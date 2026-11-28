@@ -57,10 +57,23 @@ if ($("opts")) {
   renderQ();
 }
 
+function readProof(f) {
+  return new Promise((res, rej) => {
+    const fr = new FileReader(); fr.onerror = () => rej(new Error("Could not read that file."));
+    fr.onload = () => {
+      if (f.type === "application/pdf") { if (f.size > 1500000) return rej(new Error("That PDF is too large. Please use a photo instead.")); return res(fr.result) }
+      if (!/^image\/(jpeg|png|webp)$/.test(f.type)) return rej(new Error("Please upload a photo (JPG or PNG) or a PDF."));
+      const im = new Image(); im.onerror = () => rej(new Error("Could not read that photo."));
+      im.onload = () => { const s = Math.min(1, 1100 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); res(c.toDataURL("image/jpeg", 0.75)) };
+      im.src = fr.result;
+    };
+    fr.readAsDataURL(f);
+  });
+}
 // ---------- create account ----------
 if ($("f")) {
   const cat = $("cat"); let it = null; try { it = JSON.parse(sessionStorage.getItem("mc_intake") || "null") } catch (e) {}
-  const sync = () => { $("hospitalField").style.display = cat.value === "hospital" ? "grid" : "none" };
+  const sync = () => { $("hospitalField").style.display = cat.value === "hospital" ? "grid" : "none"; $("proofField").style.display = ["student", "mutuelle"].includes(cat.value) ? "grid" : "none"; $("proofLabel").textContent = cat.value === "student" ? "Upload your student card" : "Upload your Mutuelle or insurance card" };
   const pre = new URLSearchParams(location.search).get("cat") || (it && it.answers && it.answers.who);
   if (pre && [...cat.options].some(o => o.value === pre)) cat.value = pre;
   if (it) $("jh").textContent = "Create your account to meet your match";
@@ -69,6 +82,11 @@ if ($("f")) {
     e.preventDefault(); const msg = $("msg"), d = Object.fromEntries(new FormData(e.target)); d.intake = it;
     if (!d.name || !d.contact || d.password.length < 8) { msg.textContent = "Enter a name or nickname, your email or phone, and a password of 8+ characters."; return }
     if (d.category === "hospital" && (!d.hospital || !d.patientNumber)) { msg.textContent = "Enter your hospital and patient number."; return }
+    if (["student", "mutuelle"].includes(d.category)) {
+      const f = $("proof").files[0];
+      if (!f) { msg.textContent = "Please upload a photo of your " + (d.category === "student" ? "student card." : "Mutuelle or insurance card."); return }
+      try { d.proof = await readProof(f) } catch (x) { msg.textContent = x.message; return }
+    }
     msg.textContent = "Creating your account…";
     try {
       const r = await api("/api/signup", { method: "POST", body: JSON.stringify(d) });
@@ -89,14 +107,16 @@ if ($("loginForm")) $("loginForm").addEventListener("submit", async e => {
 // ---------- booking window ----------
 function openBooking(mode, u) {
   const t = u.intake.therapist, a = u.intake.answers || {}, first = mode === "first";
-  const pre = { student: "student", mutuelle: "mutuelle_2_3", hospital: "mutuelle_2_3", other: "full" }[a.who || u.category] || "full";
+  const want = { student: "student", mutuelle: "mutuelle_2_3", hospital: "mutuelle_2_3", other: "full" }[a.who || u.category] || "full";
+  const okP = k => ["full", "group", "workplace"].includes(k) || (u.proof_status === "approved" && (k !== "student" || u.category === "student"));
+  const pre = okP(want) ? want : "full";
   const K = new Date(Date.now() + 7200000), days = [];
   for (let i = 1; days.length < 14; i++) { const d = new Date(Date.UTC(K.getUTCFullYear(), K.getUTCMonth(), K.getUTCDate() + i)); if (d.getUTCDay() !== 0) days.push(d) }
   const iso = (d, h) => d.getUTCFullYear() + "-" + p2(d.getUTCMonth() + 1) + "-" + p2(d.getUTCDate()) + "T" + p2(h) + ":00:00+02:00";
   const wrap = document.createElement("div"); wrap.className = "mback"; wrap.id = "mback";
   wrap.innerHTML = '<div class="modal" role="dialog" aria-modal="true"><button class="x" id="mx" type="button" aria-label="Close">×</button><h2>' + (first ? "Your free first chat with " : "Book ") + esc(t.name) + '</h2>' +
     (first ? '<p class="lead">Your first chat is free. Pick a time that suits you.</p>' :
-      '<h3>1. Choose your session</h3><div id="plist">' + PRICES.map(p => '<label class="opt"><input type="radio" name="pk" value="' + p[0] + '"' + (p[0] === pre ? " checked" : "") + '> <span>' + p[1] + ' · <b>' + money(p[2]) + '</b></span></label>').join("") + '</div><p class="small">We chose the first option for you from your answer to “Who are you?”. Change it if it does not fit.</p>') +
+      '<h3>1. Choose your session</h3><div id="plist">' + PRICES.map(p => '<label class="opt"><input type="radio" name="pk" value="' + p[0] + '"' + (p[0] === pre ? " checked" : "") + (okP(p[0]) ? "" : " disabled") + '> <span>' + p[1] + ' · <b>' + money(p[2]) + '</b>' + (okP(p[0]) ? "" : ' <small>(after your card is approved)</small>') + '</span></label>').join("") + '</div><p class="small">We chose the first option for you from your answer to “Who are you?”. Change it if it does not fit. Student and insurance prices unlock once our team has approved your card.</p>') +
     '<h3>' + (first ? "" : "2. ") + 'Choose a day and time</h3><div class="row2"><select id="mday" aria-label="Day">' + days.map((d, i) => '<option value="' + i + '">' + DN[d.getUTCDay()] + " " + d.getUTCDate() + " " + MN[d.getUTCMonth()] + '</option>').join("") + '</select><select id="mtime" aria-label="Time"></select></div><p class="small">Times are Kigali time.</p>' +
     (first ? "" : '<h3>3. How will you pay?</h3><div id="paylist">' + PAYS.map((p, i) => '<label class="opt"><input type="radio" name="pay" value="' + p[0] + '"' + (i == 0 ? " checked" : "") + '> ' + p[1] + '</label>').join("") + '</div>') +
     '<p style="margin-top:20px"><button class="btn" id="mgo" type="button">' + (first ? "Book my free first chat" : "Confirm booking") + '</button></p><div id="mmsg" role="status" aria-live="polite" style="min-height:24px;font-weight:500;color:var(--accent)"></div></div>';
@@ -128,6 +148,10 @@ function renderAcct(u) {
       '<div class="row2" style="margin-top:16px">' + (hasFirst ? "" : '<button class="btn" id="bFirst" type="button">Continue to your free first chat</button>') + '<button class="btn' + (hasFirst ? "" : " ghost") + '" id="bBook" type="button">Book ' + esc(t.name) + '</button></div></div>';
     else h += '<div class="card k" style="margin-top:20px"><h3>We are finding your match</h3><p>Our clinical team is choosing the right therapist or doctor for you and will confirm soon.</p></div>';
   }
+  if (["student", "mutuelle", "hospital"].includes(u.category)) {
+    const ps = u.proof_status, st = { approved: "Approved. Your discounted prices are unlocked.", pending: "We are checking it. This usually takes a short while.", rejected: "We could not accept it. Please upload a clearer photo.", none: "Upload a photo so we can unlock your discounted prices." }[ps] || "";
+    h += '<div class="card l" style="margin-top:16px"><h3>' + (u.category === "student" ? "Student card" : "Insurance card" + (u.category === "hospital" ? " (for Mutuelle prices)" : "")) + '</h3><p>' + st + '</p>' + (ps === "approved" || ps === "pending" ? "" : '<p style="margin-top:12px"><input id="proofIn" type="file" accept="image/*,application/pdf"></p><p style="margin-top:10px"><button class="btn sm" id="proofGo" type="button">Upload</button></p>') + '<div id="pmsg" class="small"></div></div>';
+  }
   const bk = u.bookings || [];
   h += '<h3 style="margin-top:28px">My appointments</h3>' + (bk.length ? '<ul class="mlist">' + bk.map(b => '<li><b>' + fmtWhen(b.starts_at) + '</b> with ' + esc(b.tname) + ' · ' + esc(b.price_label) + '</li>').join("") + '</ul>' : '<p class="lead">No appointments yet.</p>');
   h += '<p style="margin-top:26px"><a class="btn ghost sm" href="index.html#start">Answer the questions again</a> <a class="btn ghost sm" href="resources.html">Read about mental health</a> <button class="btn ghost sm" type="button" onclick="logout()">Log out</button>' + (u.isClinical ? ' <a class="btn sm" href="clinic.html">Clinical team page</a>' : '') + '</p>';
@@ -144,6 +168,10 @@ if ($("acct")) (async () => {
     $("acct").innerHTML = renderAcct(u);
     if ($("bFirst")) $("bFirst").onclick = () => openBooking("first", u);
     if ($("bBook")) $("bBook").onclick = () => openBooking("session", u);
+    if ($("proofGo")) $("proofGo").onclick = async () => {
+      const f = $("proofIn").files[0]; if (!f) { $("pmsg").textContent = "Choose a file first."; return }
+      try { const p = await readProof(f), r = await api("/api/proof", { method: "POST", body: JSON.stringify({ proof: p }) }); if (r.ok) location.reload(); else $("pmsg").textContent = r.j.error || "Could not upload." } catch (x) { $("pmsg").textContent = x.message }
+    };
   } catch (x) { $("acct").innerHTML = '<p class="lead">Can’t reach the server. Wait a minute and refresh the page.</p>' }
 })();
 
@@ -153,10 +181,11 @@ async function loadTher() {
   const r = await api("/api/clinical/therapists"); if (r.ok) THER = r.j;
   if ($("ther")) $("ther").innerHTML = THER.length ? THER.map(t => '<div class="cl"><b>' + esc(t.name) + '</b> · ' + ROLE[t.role] + ' · ' + (t.gender === "f" ? "woman" : "man") + ' · ' + esc((t.languages || []).map(dd).join(", ")) + '<br><small>' + esc(t.email) + (t.active ? "" : " (inactive)") + '</small> <button class="btn ghost sm" data-tid="' + t.id + '" data-on="' + (t.active ? 0 : 1) + '">' + (t.active ? "Deactivate" : "Activate") + '</button></div>').join("") : '<p class="lead">No therapists yet. Add the first one below.</p>';
 }
+const proofRow = x => x.proof_status && x.proof_status !== "none" ? '<dt>Proof of ' + (x.category === "student" ? "student card" : "insurance") + '</dt><dd>' + esc(x.proof_status) + ' <button class="btn ghost sm" data-proof="view" data-uid="' + x.user_id + '">View</button> <button class="btn sm" data-proof="approved" data-uid="' + x.user_id + '">Approve</button> <button class="btn ghost sm" data-proof="rejected" data-uid="' + x.user_id + '">Reject</button></dd>' : "";
 function card(x) {
   const a = x.answers || {}, c = (a.concerns || []).map(v => CL[v] || v).join(", ");
   const sel = '<select id="as-' + x.id + '"><option value="">Choose a therapist or doctor</option>' + THER.filter(t => t.active || t.id === x.therapist_id).map(t => '<option value="' + t.id + '"' + (t.id === x.therapist_id ? " selected" : "") + '>' + esc(t.name) + ' (' + ROLE[t.role] + ')</option>').join("") + '</select>';
-  return '<div class="cl' + (x.urgent ? " urg" : "") + '"><div>' + (x.urgent ? '<span class="badge u">Urgent: contact today</span>' : "") + (x.needs_doctor ? '<span class="badge p">Needs doctor review</span>' : "") + '<span class="badge a">' + esc(x.status.replace("_", " ")) + '</span></div><h3 style="margin-top:10px">' + esc(x.display_name) + '</h3><dl><dt>Contact</dt><dd>' + esc(x.contact) + '</dd><dt>Group</dt><dd>' + esc(dd(a.who) || x.category) + (x.hospital_name ? " · " + esc(x.hospital_name) + " · patient no. " + esc(x.patient_number) + (x.hospital_verified ? " (verified)" : " (not verified)") : "") + '</dd><dt>Concerns</dt><dd>' + esc(c) + '</dd><dt>Duration</dt><dd>' + esc(dd(a.duration)) + '</dd><dt>Daily impact</dt><dd>' + esc(dd(a.impact)) + '</dd><dt>Self-harm thoughts</dt><dd>' + esc(dd(a.safety)) + '</dd><dt>Doctor or medication</dt><dd>' + esc(dd(a.care)) + '</dd><dt>Preferences</dt><dd>Language: ' + esc(a.language === "any" ? "Kinyarwanda or English" : dd(a.language)) + " · " + esc(dd(a.format)) + " · therapist: " + esc(a.gender === "any" ? "no preference" : dd(a.gender)) + '</dd><dt>Suggested</dt><dd>' + esc(x.professional) + '</dd><dt>Matched to</dt><dd>' + esc(x.tname || "Nobody yet") + '</dd></dl><div class="row2">' + sel + '<button class="btn sm" data-id="' + x.id + '" data-act="assigned">Save</button><button class="btn ghost sm" data-id="' + x.id + '" data-act="closed">Close</button></div></div>';
+  return '<div class="cl' + (x.urgent ? " urg" : "") + '"><div>' + (x.urgent ? '<span class="badge u">Urgent: contact today</span>' : "") + (x.needs_doctor ? '<span class="badge p">Needs doctor review</span>' : "") + '<span class="badge a">' + esc(x.status.replace("_", " ")) + '</span></div><h3 style="margin-top:10px">' + esc(x.display_name) + '</h3><dl><dt>Contact</dt><dd>' + esc(x.contact) + '</dd><dt>Group</dt><dd>' + esc(dd(a.who) || x.category) + (x.hospital_name ? " · " + esc(x.hospital_name) + " · patient no. " + esc(x.patient_number) + (x.hospital_verified ? " (verified)" : " (not verified)") : "") + '</dd><dt>Concerns</dt><dd>' + esc(c) + '</dd><dt>Duration</dt><dd>' + esc(dd(a.duration)) + '</dd><dt>Daily impact</dt><dd>' + esc(dd(a.impact)) + '</dd><dt>Self-harm thoughts</dt><dd>' + esc(dd(a.safety)) + '</dd><dt>Doctor or medication</dt><dd>' + esc(dd(a.care)) + '</dd><dt>Preferences</dt><dd>Language: ' + esc(a.language === "any" ? "Kinyarwanda or English" : dd(a.language)) + " · " + esc(dd(a.format)) + " · therapist: " + esc(a.gender === "any" ? "no preference" : dd(a.gender)) + '</dd><dt>Suggested</dt><dd>' + esc(x.professional) + '</dd><dt>Matched to</dt><dd>' + esc(x.tname || "Nobody yet") + '</dd>' + proofRow(x) + '</dl><div class="row2">' + sel + '<button class="btn sm" data-id="' + x.id + '" data-act="assigned">Save</button><button class="btn ghost sm" data-id="' + x.id + '" data-act="closed">Close</button></div></div>';
 }
 async function loadClinic() {
   if (!tok()) { location.href = "login.html"; return }
@@ -176,11 +205,16 @@ if ($("clinic")) {
     if (act === "assigned" && !tid) { alert("Choose a therapist or doctor first."); return }
     b.disabled = true; await api("/api/clinical/intakes/" + id, { method: "POST", body: JSON.stringify({ status: act, therapistId: tid ? Number(tid) : null }) }); loadClinic();
   });
+  $("clinic").addEventListener("click", async e => {
+    const b = e.target.closest("button[data-proof]"); if (!b) return; const uid = b.dataset.uid;
+    if (b.dataset.proof === "view") { const r = await api("/api/clinical/proof/" + uid); if (!r.ok || !r.j.data) { alert("No file found."); return } const bl = await (await fetch(r.j.data)).blob(); window.open(URL.createObjectURL(bl), "_blank"); return }
+    await api("/api/clinical/proof/" + uid, { method: "POST", body: JSON.stringify({ status: b.dataset.proof }) }); loadClinic();
+  });
   $("ther").addEventListener("click", async e => { const b = e.target.closest("button[data-tid]"); if (!b) return; await api("/api/clinical/therapists/" + b.dataset.tid + "/active", { method: "POST", body: JSON.stringify({ active: b.dataset.on === "1" }) }); loadClinic() });
   $("therForm").addEventListener("submit", async e => {
     e.preventDefault(); const f = e.target, d = Object.fromEntries(new FormData(f));
     d.languages = [...f.querySelectorAll(".lg:checked")].map(x => x.value); d.specialties = [...f.querySelectorAll(".spc:checked")].map(x => x.value);
     const r = await api("/api/clinical/therapists", { method: "POST", body: JSON.stringify(d) });
-    $("tmsg").textContent = r.ok ? "Added." : (r.j.error || "Could not add."); if (r.ok) { f.reset(); loadClinic() }
+    $("tmsg").textContent = r.ok ? "Added." : (r.j.error || "Could not add (error " + r.status + "). The back end may not be updated yet."); if (r.ok) { f.reset(); loadClinic() }
   });
 }

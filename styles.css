@@ -93,3 +93,5 @@ header.top .logo{font-size:30px}
 .modal h2{font-size:26px;padding-right:30px}.modal h3{font-size:19px;margin:18px 0 8px}
 .modal select,.row2 select{width:auto;flex:1}.small{font-size:14px;color:var(--muted);margin:8px 0 0}
 @media (max-width:560px){header.top{flex-direction:column;gap:10px}.actions{position:static;transform:none}}
+
+#proofField{display:none;gap:6px}input[type=file]{padding:10px;background:var(--surface)}
