@@ -108,7 +108,7 @@ if ($("loginForm")) $("loginForm").addEventListener("submit", async e => {
 function openBooking(mode, u) {
   const t = u.intake.therapist, a = u.intake.answers || {}, first = mode === "first";
   const want = { student: "student", mutuelle: "mutuelle_2_3", hospital: "mutuelle_2_3", other: "full" }[a.who || u.category] || "full";
-  const okP = k => ["full", "group", "workplace"].includes(k) || (u.proof_status === "approved" && (k !== "student" || u.category === "student"));
+  const okP = k => ["full", "group"].includes(k) || (u.proof_status === "approved" && (k !== "student" || u.category === "student"));
   const pre = okP(want) ? want : "full";
   const K = new Date(Date.now() + 7200000), days = [];
   for (let i = 1; days.length < 14; i++) { const d = new Date(Date.UTC(K.getUTCFullYear(), K.getUTCMonth(), K.getUTCDate() + i)); if (d.getUTCDay() !== 0) days.push(d) }
@@ -148,9 +148,9 @@ function renderAcct(u) {
       '<div class="row2" style="margin-top:16px">' + (hasFirst ? "" : '<button class="btn" id="bFirst" type="button">Continue to your free first chat</button>') + '<button class="btn' + (hasFirst ? "" : " ghost") + '" id="bBook" type="button">Book ' + esc(t.name) + '</button></div></div>';
     else h += '<div class="card k" style="margin-top:20px"><h3>We are finding your match</h3><p>Our clinical team is choosing the right therapist or doctor for you and will confirm soon.</p></div>';
   }
-  if (["student", "mutuelle", "hospital"].includes(u.category)) {
+  if (["student", "mutuelle", "hospital", "other"].includes(u.category)) {
     const ps = u.proof_status, st = { approved: "Approved. Your discounted prices are unlocked.", pending: "We are checking it. This usually takes a short while.", rejected: "We could not accept it. Please upload a clearer photo.", none: "Upload a photo so we can unlock your discounted prices." }[ps] || "";
-    h += '<div class="card l" style="margin-top:16px"><h3>' + (u.category === "student" ? "Student card" : "Insurance card" + (u.category === "hospital" ? " (for Mutuelle prices)" : "")) + '</h3><p>' + st + '</p>' + (ps === "approved" || ps === "pending" ? "" : '<p style="margin-top:12px"><input id="proofIn" type="file" accept="image/*,application/pdf"></p><p style="margin-top:10px"><button class="btn sm" id="proofGo" type="button">Upload</button></p>') + '<div id="pmsg" class="small"></div></div>';
+    h += '<div class="card l" style="margin-top:16px"><h3>' + (u.category === "student" ? "Student card" : u.category === "other" ? "Work ID or letter (optional, for the workplace price)" : "Insurance card" + (u.category === "hospital" ? " (for Mutuelle prices)" : "")) + '</h3><p>' + st + '</p>' + (ps === "approved" || ps === "pending" ? "" : '<p style="margin-top:12px"><input id="proofIn" type="file" accept="image/*,application/pdf"></p><p style="margin-top:10px"><button class="btn sm" id="proofGo" type="button">Upload</button></p>') + '<div id="pmsg" class="small"></div></div>';
   }
   const bk = u.bookings || [];
   h += '<h3 style="margin-top:28px">My appointments</h3>' + (bk.length ? '<ul class="mlist">' + bk.map(b => '<li><b>' + fmtWhen(b.starts_at) + '</b> with ' + esc(b.tname) + ' · ' + esc(b.price_label) + '</li>').join("") + '</ul>' : '<p class="lead">No appointments yet.</p>');
@@ -181,7 +181,7 @@ async function loadTher() {
   const r = await api("/api/clinical/therapists"); if (r.ok) THER = r.j;
   if ($("ther")) $("ther").innerHTML = THER.length ? THER.map(t => '<div class="cl"><b>' + esc(t.name) + '</b> · ' + ROLE[t.role] + ' · ' + (t.gender === "f" ? "woman" : "man") + ' · ' + esc((t.languages || []).map(dd).join(", ")) + '<br><small>' + esc(t.email) + (t.active ? "" : " (inactive)") + '</small> <button class="btn ghost sm" data-tid="' + t.id + '" data-on="' + (t.active ? 0 : 1) + '">' + (t.active ? "Deactivate" : "Activate") + '</button></div>').join("") : '<p class="lead">No therapists yet. Add the first one below.</p>';
 }
-const proofRow = x => x.proof_status && x.proof_status !== "none" ? '<dt>Proof of ' + (x.category === "student" ? "student card" : "insurance") + '</dt><dd>' + esc(x.proof_status) + ' <button class="btn ghost sm" data-proof="view" data-uid="' + x.user_id + '">View</button> <button class="btn sm" data-proof="approved" data-uid="' + x.user_id + '">Approve</button> <button class="btn ghost sm" data-proof="rejected" data-uid="' + x.user_id + '">Reject</button></dd>' : "";
+const proofRow = x => x.proof_status && x.proof_status !== "none" ? '<dt>Proof of ' + (x.category === "student" ? "student card" : x.category === "other" ? "work proof" : "insurance") + '</dt><dd>' + esc(x.proof_status) + ' <button class="btn ghost sm" data-proof="view" data-uid="' + x.user_id + '">View</button> <button class="btn sm" data-proof="approved" data-uid="' + x.user_id + '">Approve</button> <button class="btn ghost sm" data-proof="rejected" data-uid="' + x.user_id + '">Reject</button></dd>' : "";
 function card(x) {
   const a = x.answers || {}, c = (a.concerns || []).map(v => CL[v] || v).join(", ");
   const sel = '<select id="as-' + x.id + '"><option value="">Choose a therapist or doctor</option>' + THER.filter(t => t.active || t.id === x.therapist_id).map(t => '<option value="' + t.id + '"' + (t.id === x.therapist_id ? " selected" : "") + '>' + esc(t.name) + ' (' + ROLE[t.role] + ')</option>').join("") + '</select>';
