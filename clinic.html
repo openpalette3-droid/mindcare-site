@@ -4,9 +4,18 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="styles.css"></head><body>
 <div class="note">Need urgent help? Call the MindCare toll-free line, or go to your nearest hospital. This website is not for emergencies.</div>
-<div class="wrap"><header><a class="logo" href="index.html">Mind<span>Care</span></a><nav><a href="index.html">Home</a><a href="match.html">Find a therapist</a><a href="services.html">Services</a><a href="prices.html">Prices</a><a href="hospitals.html">Hospital patients</a><a href="login.html" id="navAuth">Log in</a><a class="btn" href="join.html">Get started</a></nav></header>
+<div class="wrap"><header class="top"><a class="logo" href="index.html">Mind<span>Care</span></a><div class="actions"><a href="login.html" id="navAuth">Log in</a><a class="btn sm" href="index.html#start" id="navStart">Get started</a></div></header>
 <main>
-<section><h2>Clinical team: new requests</h2><p class="lead">Urgent cases appear first. Please check this page every day and contact urgent clients the same day.</p><p><button class="btn ghost sm" id="refresh" type="button">Refresh</button></p><div id="clinic"><p class="lead">Loading…</p></div></section>
+<div class="phero"><div><h1>Clinical team</h1><p>Manage therapists and review new requests.</p></div><div class="picbox"><img src="images/clinic.jpg" alt="Calendar" onerror="this.onerror=null;this.src='images/clinic.svg'"></div></div><section id="clinPanel"><h2>Therapists and doctors</h2><p class="lead">Clients are matched to these people automatically. Each person must also create a MindCare account with the same email so they can log in.</p>
+<div id="ther"></div>
+<form id="therForm"><h3>Add a therapist or doctor</h3><label>Name<input name="name" required></label><label>Email<input name="email" type="email" required></label>
+<label>Role<select name="role"><option value="therapist">Therapist</option><option value="psychologist">Psychologist</option><option value="doctor">Doctor</option></select></label>
+<label>Gender<select name="gender"><option value="f">Woman</option><option value="m">Man</option></select></label>
+<label>Languages</label><div class="opts"><label class="opt"><input type="checkbox" class="lg" value="rw"> Kinyarwanda</label><label class="opt"><input type="checkbox" class="lg" value="en"> English</label></div>
+<label>Specialties</label><div class="opts" id="sp"></div>
+<button class="btn" type="submit">Add</button><div id="tmsg" role="status" style="min-height:24px;font-weight:500;color:var(--accent)"></div></form></section>
+<section><h2>New requests</h2><p class="lead">Urgent cases appear first. Please check this page every day and contact urgent clients the same day.</p>
+<p><button class="btn ghost sm" id="refresh" type="button">Refresh</button></p><div id="clinic"><p class="lead">Loading…</p></div></section>
 </main>
-<footer>© 2026 MindCare, Kigali, Rwanda. Therapy is provided by licensed professionals. Your information is kept confidential and shared only with your consent.</footer></div>
+<footer><p class="flinks"><a href="resources.html">Mental health awareness</a> · <a href="services.html">Services</a> · <a href="hospitals.html">For hospital patients</a></p>© 2026 MindCare, Kigali, Rwanda. Therapy is provided by licensed professionals. Your information is kept confidential and shared only with your consent.</footer></div>
 <script src="script.js"></script></body></html>
