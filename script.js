@@ -6,7 +6,7 @@ const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&a
 const D = { student: "Student", mutuelle: "Has Mutuelle or insurance", hospital: "Hospital patient", other: "Someone else", low: "Not much", some: "A little", high: "A lot", severe: "Can barely get through the day", no: "No", sometimes: "Sometimes", often: "Yes, often or right now", none: "No doctor or medication", doctor: "Sees a doctor", meds: "Takes medication", rw: "Kinyarwanda", en: "English", any: "Either", video: "Video", voice: "Voice call", chat: "Chat", f: "A woman", m: "A man", new: "Less than 2 weeks", weeks: "2 weeks to 3 months", months: "3 to 12 months", year: "More than a year" };
 const dd = v => D[v] || v || "";
 const CL = { stress: "Stress", anxiety: "Anxiety", mood: "Low mood", trauma: "Trauma or grief", relationships: "Relationships", pressure: "School or work pressure", sleep: "Sleep", substance: "Alcohol or drug use", other: "Other" };
-const PRICES = [["student", "Student (with student ID)", 3000], ["mutuelle_1", "Mutuelle, 1st class", 2000], ["mutuelle_2_3", "Mutuelle, 2nd and 3rd class", 3000], ["mutuelle_4", "Mutuelle, 4th class", 4000], ["other_insurance", "Other insurance (co-pay varies)", null], ["workplace", "Through my workplace", 4000], ["full", "No insurance, individual session", 10000], ["group", "Group session (up to 5 people)", 15000]];
+const PRICES = [["student", "Student (with student ID)", 3000], ["mutuelle_1", "Mutuelle, 1st class", 2000], ["mutuelle_2_3", "Mutuelle, 2nd and 3rd class", 3000], ["mutuelle_4", "Mutuelle, 4th class", 4000], ["other_insurance", "Other insurance (co-pay varies)", null], ["workplace", "Through my workplace (needs proof from your employer)", 4000], ["full", "No insurance, individual session", 10000], ["group", "Group session (up to 5 people)", 15000]];
 const PAYS = [["momo", "MoMoPay"], ["card", "Visa or Mastercard"], ["cash", "Cash at a partner centre"]];
 const ROLE = { therapist: "Therapist", psychologist: "Psychologist", doctor: "Doctor" };
 const p2 = n => String(n).padStart(2, "0");
@@ -108,15 +108,15 @@ if ($("loginForm")) $("loginForm").addEventListener("submit", async e => {
 function openBooking(mode, u) {
   const t = u.intake.therapist, a = u.intake.answers || {}, first = mode === "first";
   const want = { student: "student", mutuelle: "mutuelle_2_3", hospital: "mutuelle_2_3", other: "full" }[a.who || u.category] || "full";
-  const okP = k => ["full", "group"].includes(k) || (u.proof_status === "approved" && (k !== "student" || u.category === "student"));
-  const pre = okP(want) ? want : "full";
+  const okP = k => ["full", "group"].includes(k) || (u.proof_status === "approved" && u.approved_price === k);
+  const pre = u.proof_status === "approved" && u.approved_price ? u.approved_price : "full";
   const K = new Date(Date.now() + 7200000), days = [];
   for (let i = 1; days.length < 14; i++) { const d = new Date(Date.UTC(K.getUTCFullYear(), K.getUTCMonth(), K.getUTCDate() + i)); if (d.getUTCDay() !== 0) days.push(d) }
   const iso = (d, h) => d.getUTCFullYear() + "-" + p2(d.getUTCMonth() + 1) + "-" + p2(d.getUTCDate()) + "T" + p2(h) + ":00:00+02:00";
   const wrap = document.createElement("div"); wrap.className = "mback"; wrap.id = "mback";
   wrap.innerHTML = '<div class="modal" role="dialog" aria-modal="true"><button class="x" id="mx" type="button" aria-label="Close">×</button><h2>' + (first ? "Your free first chat with " : "Book ") + esc(t.name) + '</h2>' +
     (first ? '<p class="lead">Your first chat is free. Pick a time that suits you.</p>' :
-      '<h3>1. Choose your session</h3><div id="plist">' + PRICES.map(p => '<label class="opt"><input type="radio" name="pk" value="' + p[0] + '"' + (p[0] === pre ? " checked" : "") + (okP(p[0]) ? "" : " disabled") + '> <span>' + p[1] + ' · <b>' + money(p[2]) + '</b>' + (okP(p[0]) ? "" : ' <small>(after your card is approved)</small>') + '</span></label>').join("") + '</div><p class="small">We chose the first option for you from your answer to “Who are you?”. Change it if it does not fit. Student and insurance prices unlock once our team has approved your card.</p>') +
+      '<h3>1. Choose your session</h3><div id="plist">' + PRICES.map(p => '<label class="opt"><input type="radio" name="pk" value="' + p[0] + '"' + (p[0] === pre ? " checked" : "") + (okP(p[0]) ? "" : " disabled") + '> <span>' + p[1] + ' · <b>' + money(p[2]) + '</b>' + (okP(p[0]) ? "" : ' <small>(after your proof is approved)</small>') + '</span></label>').join("") + '</div><p class="small">We chose the first option for you from your answer to “Who are you?”. Change it if it does not fit. Discounted prices unlock once our team has approved your proof, and only the price you are approved for can be chosen.</p>') +
     '<h3>' + (first ? "" : "2. ") + 'Choose a day and time</h3><div class="row2"><select id="mday" aria-label="Day">' + days.map((d, i) => '<option value="' + i + '">' + DN[d.getUTCDay()] + " " + d.getUTCDate() + " " + MN[d.getUTCMonth()] + '</option>').join("") + '</select><select id="mtime" aria-label="Time"></select></div><p class="small">Times are Kigali time.</p>' +
     (first ? "" : '<h3>3. How will you pay?</h3><div id="paylist">' + PAYS.map((p, i) => '<label class="opt"><input type="radio" name="pay" value="' + p[0] + '"' + (i == 0 ? " checked" : "") + '> ' + p[1] + '</label>').join("") + '</div>') +
     '<p style="margin-top:20px"><button class="btn" id="mgo" type="button">' + (first ? "Book my free first chat" : "Confirm booking") + '</button></p><div id="mmsg" role="status" aria-live="polite" style="min-height:24px;font-weight:500;color:var(--accent)"></div></div>';
@@ -149,8 +149,8 @@ function renderAcct(u) {
     else h += '<div class="card k" style="margin-top:20px"><h3>We are finding your match</h3><p>Our clinical team is choosing the right therapist or doctor for you and will confirm soon.</p></div>';
   }
   if (["student", "mutuelle", "hospital", "other"].includes(u.category)) {
-    const ps = u.proof_status, st = { approved: "Approved. Your discounted prices are unlocked.", pending: "We are checking it. This usually takes a short while.", rejected: "We could not accept it. Please upload a clearer photo.", none: "Upload a photo so we can unlock your discounted prices." }[ps] || "";
-    h += '<div class="card l" style="margin-top:16px"><h3>' + (u.category === "student" ? "Student card" : u.category === "other" ? "Work ID or letter (optional, for the workplace price)" : "Insurance card" + (u.category === "hospital" ? " (for Mutuelle prices)" : "")) + '</h3><p>' + st + '</p>' + (ps === "approved" || ps === "pending" ? "" : '<p style="margin-top:12px"><input id="proofIn" type="file" accept="image/*,application/pdf"></p><p style="margin-top:10px"><button class="btn sm" id="proofGo" type="button">Upload</button></p>') + '<div id="pmsg" class="small"></div></div>';
+    const ps = u.proof_status, ap = PRICES.find(x => x[0] === u.approved_price), st = { approved: "Approved. Your price: " + (ap ? ap[1] + " · " + money(ap[2]) : "discounted") + ".", pending: "We are checking it. This usually takes a short while.", rejected: "We could not accept it. Please upload a clearer photo.", none: "Upload a photo so we can unlock your discounted prices." }[ps] || "";
+    h += '<div class="card l" style="margin-top:16px"><h3>' + (u.category === "student" ? "Student card" : u.category === "other" ? "Proof for the workplace price (optional)" : "Insurance card" + (u.category === "hospital" ? " (for Mutuelle prices)" : "")) + '</h3><p>' + st + (u.category === "other" && ps !== "approved" ? " Use your company insurance card, an employer letter or a work ID. If your company is a MindCare partner, we will confirm it." : "") + '</p>' + (ps === "approved" || ps === "pending" ? "" : '<p style="margin-top:12px"><input id="proofIn" type="file" accept="image/*,application/pdf"></p><p style="margin-top:10px"><button class="btn sm" id="proofGo" type="button">Upload</button></p>') + '<div id="pmsg" class="small"></div></div>';
   }
   const bk = u.bookings || [];
   h += '<h3 style="margin-top:28px">My appointments</h3>' + (bk.length ? '<ul class="mlist">' + bk.map(b => '<li><b>' + fmtWhen(b.starts_at) + '</b> with ' + esc(b.tname) + ' · ' + esc(b.price_label) + '</li>').join("") + '</ul>' : '<p class="lead">No appointments yet.</p>');
@@ -181,7 +181,13 @@ async function loadTher() {
   const r = await api("/api/clinical/therapists"); if (r.ok) THER = r.j;
   if ($("ther")) $("ther").innerHTML = THER.length ? THER.map(t => '<div class="cl"><b>' + esc(t.name) + '</b> · ' + ROLE[t.role] + ' · ' + (t.gender === "f" ? "woman" : "man") + ' · ' + esc((t.languages || []).map(dd).join(", ")) + '<br><small>' + esc(t.email) + (t.active ? "" : " (inactive)") + '</small> <button class="btn ghost sm" data-tid="' + t.id + '" data-on="' + (t.active ? 0 : 1) + '">' + (t.active ? "Deactivate" : "Activate") + '</button></div>').join("") : '<p class="lead">No therapists yet. Add the first one below.</p>';
 }
-const proofRow = x => x.proof_status && x.proof_status !== "none" ? '<dt>Proof of ' + (x.category === "student" ? "student card" : x.category === "other" ? "work proof" : "insurance") + '</dt><dd>' + esc(x.proof_status) + ' <button class="btn ghost sm" data-proof="view" data-uid="' + x.user_id + '">View</button> <button class="btn sm" data-proof="approved" data-uid="' + x.user_id + '">Approve</button> <button class="btn ghost sm" data-proof="rejected" data-uid="' + x.user_id + '">Reject</button></dd>' : "";
+const DKEYS = PRICES.filter(p => !["full", "group"].includes(p[0]));
+const proofRow = x => {
+  if (!x.proof_status || x.proof_status === "none") return "";
+  const def = { student: "student", mutuelle: "mutuelle_2_3", hospital: "mutuelle_2_3", other: "workplace" }[x.category];
+  const sel = '<select id="pp-' + x.user_id + '">' + DKEYS.map(p => '<option value="' + p[0] + '"' + ((x.approved_price || def) === p[0] ? " selected" : "") + '>' + p[1] + '</option>').join("") + '</select>';
+  return '<dt>Proof</dt><dd>' + esc(x.proof_status) + (x.approved_price ? " (price: " + esc(x.approved_price) + ")" : "") + ' <button class="btn ghost sm" data-proof="view" data-uid="' + x.user_id + '">View</button><div class="row2">' + sel + '<button class="btn sm" data-proof="approved" data-uid="' + x.user_id + '">Approve this price</button><button class="btn ghost sm" data-proof="rejected" data-uid="' + x.user_id + '">Reject</button></div></dd>';
+};
 function card(x) {
   const a = x.answers || {}, c = (a.concerns || []).map(v => CL[v] || v).join(", ");
   const sel = '<select id="as-' + x.id + '"><option value="">Choose a therapist or doctor</option>' + THER.filter(t => t.active || t.id === x.therapist_id).map(t => '<option value="' + t.id + '"' + (t.id === x.therapist_id ? " selected" : "") + '>' + esc(t.name) + ' (' + ROLE[t.role] + ')</option>').join("") + '</select>';
@@ -208,7 +214,7 @@ if ($("clinic")) {
   $("clinic").addEventListener("click", async e => {
     const b = e.target.closest("button[data-proof]"); if (!b) return; const uid = b.dataset.uid;
     if (b.dataset.proof === "view") { const r = await api("/api/clinical/proof/" + uid); if (!r.ok || !r.j.data) { alert("No file found."); return } const bl = await (await fetch(r.j.data)).blob(); window.open(URL.createObjectURL(bl), "_blank"); return }
-    await api("/api/clinical/proof/" + uid, { method: "POST", body: JSON.stringify({ status: b.dataset.proof }) }); loadClinic();
+    await api("/api/clinical/proof/" + uid, { method: "POST", body: JSON.stringify({ status: b.dataset.proof, priceKey: b.dataset.proof === "approved" ? $("pp-" + uid).value : null }) }); loadClinic();
   });
   $("ther").addEventListener("click", async e => { const b = e.target.closest("button[data-tid]"); if (!b) return; await api("/api/clinical/therapists/" + b.dataset.tid + "/active", { method: "POST", body: JSON.stringify({ active: b.dataset.on === "1" }) }); loadClinic() });
   $("therForm").addEventListener("submit", async e => {
